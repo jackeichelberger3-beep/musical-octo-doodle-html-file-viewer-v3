@@ -1,0 +1,39 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>HTML Studio — standalone</title>
+  <meta name="description" content="HTML Studio standalone: write HTML, CSS and JavaScript with tabs, live preview, minimap, code folding, snippets, plugins and a key-protected terminal." />
+  <link rel="preconnect" href="https://fonts.googleapis.com" />
+  <link href="https://fonts.googleapis.com/css2?family=Roboto:wght@300;400;500;700&family=Roboto+Mono:wght@400;500&display=swap" rel="stylesheet" />
+  <link rel="stylesheet" href="css/studio.css" />
+</head>
+<body>
+  <div id="hs-app">
+    <header id="hs-top"></header>
+    <div id="hs-body">
+      <nav id="hs-rail"></nav>
+      <div id="hs-workspace">
+        <section class="hs-panel" data-panel="explorer"></section>
+        <section class="hs-panel" data-panel="pages"></section>
+        <section class="hs-panel" data-panel="code"></section>
+        <section class="hs-panel" data-panel="preview"></section>
+        <section class="hs-panel" data-panel="terminal"></section>
+      </div>
+    </div>
+    <footer id="hs-status"></footer>
+  </div>
+
+  <div id="hs-modals"></div>
+  <div id="hs-menus"></div>
+
+  <!-- order matters: keys first, then engines, then the app -->
+  <script src="js/keys.js"></script>
+  <script src="js/core.js"></script>
+  <script src="js/templates.js"></script>
+  <script src="js/terminal.js"></script>
+  <script src="js/editor.js"></script>
+  <script src="js/app.js"></script>
+</body>
+</html>
