@@ -63,9 +63,12 @@ if count > 2 { print "big" }
 SECURITY
 --------
 keys                     List which tiers exist (not the keys themselves).
-key <access key>         Unlock a tier. Advanced commands (new, close,
-                         theme, set, plugin, export, snippet) answer only
-                         after a key has been accepted.
+keys list                Owner only — reveal every key and its tier.
+owner                    Show whether owner controls are active.
+wipe                     Owner only — erase all local storage and reload.
+key <access key>         Unlock a tier. Access is role-based: read commands
+                         need any key, edit commands need dev+, plugins need
+                         admin+, and keys list / wipe need the owner key.
 
 EXAMPLES
 --------
@@ -209,5 +212,8 @@ window.HS.TERMINAL_COMMANDS = [
   ['plugins / plugin example', 'manage plugins'],
   ['repeat N { ... } / if a == b { ... }', 'control flow'],
   ['key <access key>', 'unlock a tier'],
+  ['keys list', 'owner only — reveal every key'],
+  ['owner', 'show owner status'],
+  ['wipe', 'owner only — erase all storage'],
   ['clear', 'empty the terminal']
 ];
