@@ -34,7 +34,8 @@
  3. Paxton
  4. Jaaken
  5. Konnor
- 6
+ 6. James
+ 7. 
  */
 
 window.HS_KEYS = [
