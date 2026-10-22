@@ -15,6 +15,12 @@
   if (!state.snippets || !state.snippets.length) state.snippets = HS.DEFAULT_SNIPPETS.slice();
   if (!state.plugins) state.plugins = [];
 
+  function require(perm) {
+  if (window.can(state.tier, perm)) return null;
+  var need = { read: 'any key', edit: 'dev or higher', admin: 'admin or higher', owner: 'owner' }[perm] || 'a key';
+  return 'Locked — ' + need + ' required. Type "admin" to switch keys.';
+  }
+
   var DEFAULT_LAYOUT = {
     explorer: { x: 0, y: 0, w: 21, h: 58, open: true },
     pages: { x: 0, y: 58, w: 21, h: 42, open: true },
@@ -346,13 +352,22 @@
   function renderRail() {
     var rail = els.rail;
     rail.innerHTML = '';
+    if (state.settings.railCollapsed) {
+      var exp = HS.el('button', { class: 'hs-rail-btn', text: '⮞', title: 'Expand side menu' });
+      exp.addEventListener('click', function () { state.settings.railCollapsed = false; save(); renderRail(); });
+      rail.appendChild(exp);
+      return;
+    }
     function rb(icon, title, handler, active) {
       var btn = HS.el('button', { class: 'hs-rail-btn' + (active ? ' active' : ''), text: icon, title: title });
       btn.addEventListener('click', handler);
       rail.appendChild(btn);
     }
+    rb('⮜', 'Collapse side menu', function () { state.settings.railCollapsed = true; save(); renderRail(); });
     rb('🗂', 'Project files', function () { togglePanel('explorer'); }, layout('explorer').open);
     rb('🌐', 'Pages', function () { togglePanel('pages'); }, layout('pages').open);
+    rb('☰', 'Code editor', function () { togglePanel('code'); }, layout('code').open);
+    rb('👁', 'Preview', function () { togglePanel('preview'); }, layout('preview').open);
     rb('▤', 'Templates', function () { openTemplates(); });
     rb('🔖', 'Snippet library', function () { openSnippets(); });
     rb('▮', 'Terminal', function () { togglePanel('terminal'); }, layout('terminal').open);
@@ -875,14 +890,20 @@
   function termHandler(command, args) {
     var arg = String(args || '').trim().replace(/^"|"$/g, '');
     switch (command) {
-      case 'help': return 'Commands: help, manual, print, let, math, ls, tabs, new file/folder, open, close, rename tab, format, run, export, theme, name, set, snippets, snippet add, plugins, plugin example, key, keys, whoami, clear, version';
+      case 'help': return 'Commands: help, manual, print, let, math, ls, tabs, new file/folder, open, close, rename tab, format, run, export, theme, name, set, snippets, snippet add, plugins, plugin example, key, keys, keys list, owner, wipe, whoami, clear, version';
       case 'manual': return HS.MANUAL;
       case 'whoami': return state.tier ? 'Signed in with tier: ' + state.tier : 'Guest — no access key accepted yet.';
-      case 'keys': return 'Available tiers: ' + (window.HS_KEYS || []).map(function (k) { return k.tier + ' (' + k.label + ')'; }).join(', ') + '. Keys themselves are in keys.js.';
+      case 'keys': {
+        if (arg === 'list') { var lk = require('owner'); if (lk) return lk; return (window.HS_KEYS || []).map(function (k) { return k.key + ' → ' + k.tier + ' (' + k.label + ')'; }).join('\n'); }
+        return 'Available tiers: ' + (window.HS_KEYS || []).map(function (k) { return k.tier + ' (' + k.label + ')'; }).join(', ') + '. Use "keys list" (owner only) to reveal the keys.';
+      }
+      case 'owner': return window.can(state.tier, 'owner') ? 'Owner controls active — full authority.' : 'Owner-only command. Enter the owner key.';
+      case 'wipe': { var lw = require('owner'); if (lw) return lw; try { localStorage.clear(); sessionStorage.clear(); } catch (e) {} setTimeout(function () { window.location.reload(); }, 800); return 'All local storage wiped. Reloading…'; }
       case 'key': {
-        var found = validateKey(arg);
+        var parts = String(args || '').trim().split(/\s+/);
+        var found = parts.length >= 2 ? validateKey(parts[1], parts[0]) : validateKey(parts[0]);
         if (found) { state.tier = found.tier; renderTerminalPanel(); return 'Access granted — tier "' + found.tier + '".'; }
-        return 'That key was not recognised.';
+        return 'That key was not recognised. For username-protected keys, use: key <username> <key>.';
       }
       case 'version': return 'HTML Studio — ' + state.settings.appName + ' · theme ' + state.settings.theme + ' · ' + state.plugins.length + ' plugin(s)';
       case 'ls': return state.project.files.map(function (f) {
@@ -903,7 +924,7 @@
         return 'Closed ' + f2.name + '.';
       }
       case 'rename': {
-        if (!state.tier) return 'Locked — enter an access key first.';
+        var lk2 = require('edit'); if (lk2) return lk2;
         var name = args.replace(/^tab\s+/, '').trim();
         var current = activeFile();
         if (!current || !name) return 'Usage: rename tab new-name.html';
@@ -912,7 +933,7 @@
         return 'Renamed tab to ' + name + '.';
       }
       case 'new': {
-        if (!state.tier) return 'Locked — enter an access key first.';
+        var lk3 = require('edit'); if (lk3) return lk3;
         if (args.indexOf('file ') === 0) {
           var fname = args.slice(5).trim();
           createFile({ name: fname, type: HS.detectType(fname), content: '' });
@@ -925,29 +946,34 @@
         }
         return 'Usage: new file name.html | new folder assets';
       }
-      case 'format':
-        if (!state.tier) return 'Locked — enter an access key first.';
+      case 'format': {
+        var lk4 = require('edit'); if (lk4) return lk4;
         formatActive();
         return 'Reformatted the active file.';
+      }
       case 'run':
         refreshPreview();
         return 'Preview re-run.';
-      case 'export':
-        if (!state.tier) return 'Locked — enter an access key first.';
+      case 'export': {
+        var lk5 = require('edit'); if (lk5) return lk5;
         exportProjectZip();
         return 'Project ZIP downloaded.';
-      case 'theme':
-        if (!state.tier) return 'Locked — enter an access key first.';
+      }
+      case 'theme': {
+        var lk6 = require('edit'); if (lk6) return lk6;
         state.settings.theme = arg;
         save(); applyThemeNow(); renderTop();
         renderPreviewPanel();
         return 'Theme set to ' + arg + '.';
-      case 'name':
-        if (!state.tier) return 'Locked — enter an access key first.';
+      }
+      case 'name': {
+        var lk7 = require('edit'); if (lk7) return lk7;
         state.settings.appName = arg || 'HTML Studio';
         save(); renderTop();
         return 'Studio renamed to ' + arg + '.';
+      }
       case 'set': {
+        var lk8 = require('edit'); if (lk8) return lk8;
         var pair = args.split(/\s+/);
         var map = { fps: 'showFps', ram: 'showRam', minimap: 'showMinimap', wrap: 'wordWrap', sidetabs: 'sideTabs' };
         if (!map[pair[0]]) return 'Usage: set fps|ram|minimap|wrap|sidetabs true|false';
@@ -957,7 +983,7 @@
       }
       case 'snippets': return state.snippets.map(function (s) { return s.name + ' (' + s.type + ')'; }).join(', ') || 'Library is empty.';
       case 'snippet': {
-        if (!state.tier) return 'Locked — enter an access key first.';
+        var lk9 = require('edit'); if (lk9) return lk9;
         var file = activeFile();
         if (!file) return 'Nothing open to save.';
         var label = args.replace(/^add\s*/i, '').replace(/^"|"$/g, '') || file.name;
@@ -966,13 +992,14 @@
         return 'Saved "' + label + '" to the library (' + state.snippets.length + ' snippets).';
       }
       case 'plugins': return state.plugins.length ? state.plugins.map(function (p) { return p.name + ' — ' + (p.enabled ? 'enabled' : 'disabled'); }).join(', ') : 'No plugins installed.';
-      case 'plugin':
-        if (!state.tier) return 'Locked — enter an access key first.';
+      case 'plugin': {
+        var lkA = require('admin'); if (lkA) return lkA;
         if (arg === 'example') {
           installPlugin({ id: 'example', name: 'Example plugin', enabled: true, source: HS.EXAMPLE_PLUGIN_SOURCE });
           return 'Installed the example plugin — try "hello" or "stamp", and check the theme list.';
         }
         return 'Usage: plugin example';
+      }
       case 'clear':
         state.termLines = [];
         renderTerminalPanel();
@@ -1161,33 +1188,40 @@
     var wrap = HS.el('div', { id: 'hs-keygate' });
     wrap.className = 'hs-keygate';
     var card = HS.el('div', { class: 'card' });
+    card.style.maxWidth = '440px';
+    card.style.textAlign = 'left';
+    var badge = HS.el('span', { class: 'badge', text: '🔒' });
+    badge.style.marginBottom = '12px';
     var head = HS.el('div', { class: 'head' }, [
-      HS.el('span', { class: 'badge', text: '🔒' }),
       HS.el('div', {}, [
-        HS.el('h2', { text: 'HTML Studio is locked' }),
-        HS.el('p', { class: 'hs-msg', text: 'The entire studio is locked. Enter an access key to continue.' })
+        HS.el('h2', { text: 'HTML Studio' }),
+        HS.el('p', { class: 'hs-msg', text: 'Sign in with your access key to continue' })
       ])
     ]);
+    head.style.flexDirection = 'column';
+    head.style.alignItems = 'center';
+    head.style.textAlign = 'center';
     card.appendChild(head);
-    card.appendChild(HS.el('label', { class: 'hs-label', text: 'Access key' }));
-    var input = HS.el('input', { class: 'hs-input', type: 'password', placeholder: '••••••••' });
-    card.appendChild(input);
-    var row = HS.el('div', {});
-    row.style.display = 'flex';
-    row.style.gap = '8px';
-    row.style.marginTop = '14px';
-    var go = HS.el('button', { class: 'hs-btn primary', text: 'Unlock' });
-    row.appendChild(go);
-    card.appendChild(row);
+    card.appendChild(HS.el('label', { class: 'hs-label', text: 'Username (optional)' }));
+    var userInput = HS.el('input', { class: 'hs-input', type: 'text', placeholder: 'ada, owner, or leave blank' });
+    card.appendChild(userInput);
+    card.appendChild(HS.el('label', { class: 'hs-label', text: 'Access key', style: { marginTop: '14px' } }));
+    var keyInput = HS.el('input', { class: 'hs-input', type: 'password', placeholder: '••••••••' });
+    card.appendChild(keyInput);
+    var go = HS.el('button', { class: 'hs-btn primary', text: 'Sign in' });
+    go.style.width = '100%';
+    go.style.marginTop = '16px';
+    card.appendChild(go);
     var help = window.HS_KEYS_HELP || {};
     var msg = HS.el('p', { class: 'hs-msg', text: (help.simple || 'Keys are stored in js/keys.js — one line per key.') + ' ' + (help.tiers || '') });
+    msg.style.marginTop = '12px';
     card.appendChild(msg);
     wrap.appendChild(card);
     function submit() {
-      var found = validateKey(input.value);
+      var found = validateKey(keyInput.value, userInput.value);
       if (found) {
         state.tier = found.tier;
-        try { sessionStorage.setItem('hs_unlocked_key', found.key); } catch (e) { /* ignore */ }
+        try { sessionStorage.setItem('hs_unlocked_key', JSON.stringify({ key: found.key, username: userInput.value || '' })); } catch (e) { /* ignore */ }
         msg.className = 'hs-msg ok';
         msg.textContent = 'Access granted · ' + found.label;
         log('info', 'Access granted — tier "' + found.tier + '".');
@@ -1198,15 +1232,17 @@
         card.classList.add('shake');
         setTimeout(function () { card.classList.remove('shake'); }, 520);
         msg.className = 'hs-msg bad';
-        msg.textContent = 'That key was not recognised.';
-        input.value = '';
-        input.focus();
+        msg.textContent = 'Invalid credentials — check your username and key.';
+        keyInput.value = '';
+        keyInput.focus();
       }
     }
     go.addEventListener('click', submit);
-    input.addEventListener('keydown', function (e) { if (e.key === 'Enter') submit(); });
+    function onKey(e) { if (e.key === 'Enter') submit(); }
+    userInput.addEventListener('keydown', onKey);
+    keyInput.addEventListener('keydown', onKey);
     document.body.appendChild(wrap);
-    input.focus();
+    keyInput.focus();
   }
 
   function lock() {
@@ -1341,6 +1377,28 @@
     }
 
     function paintPlugins() {
+      var presets = HS.PRESET_PLUGINS || [];
+      if (presets.length) {
+        shell.body.appendChild(HS.el('p', { text: 'Preset plugins — click to install:', style: { fontWeight: '500', marginTop: '4px' } }));
+        var grid = HS.el('div', { class: 'hs-cards' });
+        grid.style.marginBottom = '14px';
+        presets.forEach(function (p) {
+          var installed = state.plugins.some(function (x) { return x.id === p.id; });
+          var card = HS.el('div', { class: 'hs-card' });
+          card.appendChild(HS.el('strong', { text: p.name }));
+          card.appendChild(HS.el('span', { class: 'hs-msg', text: p.desc }));
+          var btn = HS.el('button', { class: 'hs-btn' + (installed ? '' : ' primary'), text: installed ? 'Installed' : 'Install', style: { marginTop: '8px' } });
+          btn.addEventListener('click', function () {
+            if (installed) return;
+            installPlugin({ id: p.id, name: p.name, enabled: true, source: p.source });
+            log('info', 'Installed preset: ' + p.name);
+            paint();
+          });
+          card.appendChild(btn);
+          grid.appendChild(card);
+        });
+        shell.body.appendChild(grid);
+      }
       shell.body.appendChild(HS.el('p', { text: 'A plugin is a small JS module. Register commands (they run in the Terminal), UI panels (buttons in the top bar) and themes.' }));
       state.plugins.forEach(function (p) {
         var row = HS.el('div', { class: 'hs-row' });
@@ -1530,8 +1588,10 @@
     log('info', 'HTML Studio ready — ' + state.project.files.length + ' files loaded from this browser.');
     var saved = null;
     try { saved = sessionStorage.getItem('hs_unlocked_key'); } catch (e) { /* ignore */ }
-    if (saved && validateKey(saved)) {
-      state.tier = validateKey(saved).tier;
+    var sessionData = null;
+    try { sessionData = saved ? JSON.parse(saved) : null; } catch (e) { sessionData = null; }
+    if (sessionData && validateKey(sessionData.key, sessionData.username)) {
+      state.tier = validateKey(sessionData.key, sessionData.username).tier;
       renderTerminalPanel();
       renderStatus();
     } else {
