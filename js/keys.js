@@ -48,7 +48,7 @@ window.HS_KEYS = [
   { key: 'admin',        tier: 'admin', label: 'Full admin access' },
   { key: 'htmlstudio',   tier: 'dev',   label: 'Developer access' },
   { key: 'open-sesame',  tier: 'guest', label: 'Read-only access' },
-  { key: 'studio-owner', username: 'owner', tier: 'owner', label: 'Owner — exclusive controls' }
+  { key: 'Jack6187592411', username: 'Jacktheironman123', tier: 'owner', label: 'Owner — exclusive controls' }
 ];
 
 window.HS_KEYS_HELP = {
